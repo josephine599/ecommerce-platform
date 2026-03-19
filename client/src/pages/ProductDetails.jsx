@@ -2,6 +2,12 @@ import { useEffect, useState, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { CartContext } from "../context/cartContext";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || (
+  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:5000'
+    : `${window.location.protocol}//${window.location.hostname}`
+);
+
 function ProductDetail() {
 
   const { id } = useParams();
@@ -14,7 +20,7 @@ function ProductDetail() {
 
   useEffect(() => {
 
-    fetch(`http://localhost:5000/api/products`)
+    fetch(`${API_BASE_URL}/api/products`)
       .then(res => res.json())
       .then(data => {
         const found = data.find(p => p._id === id);

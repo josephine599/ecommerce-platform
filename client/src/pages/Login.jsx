@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || (
+  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:5000'
+    : `${window.location.protocol}//${window.location.hostname}`
+);
+
 function Login() {
   const navigate = useNavigate();
 
@@ -15,7 +21,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

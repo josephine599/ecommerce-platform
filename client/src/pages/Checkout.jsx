@@ -2,6 +2,13 @@ import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CartContext } from "../context/cartContext";
 
+// Get API base URL - use environment variable or fallback
+const API_BASE_URL = import.meta.env.VITE_API_URL || (
+  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:5000'
+    : `${window.location.protocol}//${window.location.hostname}:5000`
+);
+
 function Checkout() {
   const { cart, clearCart } = useContext(CartContext);
   const navigate = useNavigate();
@@ -29,73 +36,118 @@ function Checkout() {
 
   const processOrder = async (paymentData) => {
     try {
-      const response = await fetch("http://localhost:5000/api/orders", {
+      const orderPayload = {
+        ...formData,
+        items: cart,
+        total,
+        paymentMethod,
+        paymentData
+      };
+
+      console.log("Creating order with payload:", orderPayload);
+
+      const response = await fetch(`${API_BASE_URL}/api/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ...formData,
-          items: cart,
-          total,
-          paymentMethod,
-          paymentData
-        }),
+        body: JSON.stringify(orderPayload),
       });
 
       if (response.ok) {
         const orderData = await response.json();
-        setSuccess("Order placed successfully!");
+        console.log("Order created successfully:", orderData);
+        setSuccess("✅ Order placed successfully!");
         clearCart();
         setTimeout(() => {
           navigate("/");
         }, 2000);
       } else {
-        throw new Error("Failed to create order");
+        const errorData = await response.json();
+        console.error("Order creation failed:", errorData);
+        throw new Error(errorData.message || "Failed to create order");
       }
     } catch (err) {
-      setError("Error placing order: " + err.message);
+      console.error("Order processing error:", err);
+      setError("❌ Error placing order: " + err.message);
     }
   };
 
   const handleMpesaPayment = async (e) => {
     e.preventDefault();
+    
+    // Validate and clean phone number
+    const cleanPhone = formData.phone.replace(/\s|-|\(|\)/g, '').trim();
+    
+    // More flexible phone validation for Kenyan numbers
+    // Accept: 0712345678, 254712345678, +254712345678, 0703290162, etc.
+    const phoneRegex = /^(?:\+?254|0)[\d]{9,}$/;
+    
+    console.log("M-Pesa Payment initiated");
+    console.log("Phone validation check:", { original: formData.phone, cleaned: cleanPhone, regex_passes: phoneRegex.test(cleanPhone) });
+    
+    if (!phoneRegex.test(cleanPhone) || cleanPhone.length < 10) {
+      setError("❌ Invalid phone number. Use: 0712345678, +254712345678, or 254712345678");
+      setPaymentProcessing(false);
+      return;
+    }
+
     setPaymentProcessing(true);
     setError("");
     setSuccess("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/mpesa/stkpush", {
+      const payload = {
+        phone: cleanPhone,
+        amount: total,
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName
+      };
+
+      console.log("M-Pesa API Request Payload:", payload);
+
+      const response = await fetch(`${API_BASE_URL}/api/mpesa/stkpush`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          phone: formData.phone,
-          amount: total,
-          email: formData.email,
-          firstName: formData.firstName,
-          lastName: formData.lastName
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
-      if (response.ok && data.checkoutRequestId) {
-        setSuccess("📱 Check your phone for the M-Pesa prompt!");
-        // Simulate waiting for callback
+      console.log("M-Pesa API Response:", { status: response.status, data });
+
+      if (!response.ok) {
+        const errorMsg = data.error || data.message || "Failed to initiate M-Pesa payment";
+        setError(`❌ M-Pesa Error: ${errorMsg}`);
+        console.error("M-Pesa API error response:", data);
+        setPaymentProcessing(false);
+        return;
+      }
+
+      if (data.checkoutRequestId || data.success) {
+        setSuccess(`📱 STK prompt sent to ${formData.phone}. Check your phone to complete payment.`);
+        console.log("STK push initiated successfully:", data.checkoutRequestId);
+        
+        // Wait for payment confirmation
         setTimeout(() => {
           processOrder({
             checkoutRequestId: data.checkoutRequestId,
-            amount: total
+            amount: total,
+            paymentResponse: data
           });
-        }, 3000);
+          setPaymentProcessing(false);
+        }, 5000);
       } else {
-        setError(data.error || "Failed to initiate M-Pesa payment");
+        setError(`❌ Unexpected response from M-Pesa`);
+        console.error("Unexpected M-Pesa response:", data);
+        setPaymentProcessing(false);
       }
     } catch (err) {
-      setError("Payment initiation failed: " + err.message);
-    } finally {
+      console.error("M-Pesa Payment error:", err);
+      setError(`❌ Payment error: ${err.message}`);
       setPaymentProcessing(false);
     }
   };
@@ -111,6 +163,20 @@ function Checkout() {
   };
 
   const handleSubmit = async (e) => {
+    // Validate all fields are filled
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.postalCode) {
+      setError("❌ Please fill in all required fields");
+      return;
+    }
+
+    if (cart.length === 0) {
+      setError("❌ Your cart is empty");
+      return;
+    }
+
+    console.log("Form submit - Cart items:", cart);
+    console.log("Form submit - Total:", total);
+
     if (paymentMethod === "mpesa") {
       handleMpesaPayment(e);
     } else if (paymentMethod === "card") {

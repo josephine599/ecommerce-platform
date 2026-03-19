@@ -2,30 +2,51 @@ const mongoose = require("mongoose");
 
 const orderSchema = mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-      ref: "User",
+    customer: {
+      firstName: { type: String, required: true },
+      lastName: { type: String, required: true },
+      email: { type: String, required: true },
+      phone: { type: String, required: true },
+      address: { type: String, required: true },
+      city: { type: String, required: true },
+      postalCode: { type: String, required: true }
     },
-    orderItems: [
+    items: [
       {
+        _id: mongoose.Schema.Types.ObjectId,
         name: String,
         qty: Number,
-        image: String,
         price: Number,
-        product: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-        },
+        image: String,
       },
     ],
     totalPrice: {
       type: Number,
       required: true,
     },
-    isPaid: {
-      type: Boolean,
-      default: false,
+    paymentMethod: {
+      type: String,
+      enum: ['mpesa', 'card', 'bank'],
+      default: 'mpesa'
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'completed', 'failed', 'cancelled'],
+      default: 'pending'
+    },
+    paymentData: {
+      checkoutRequestId: String,
+      mpesaReceiptNumber: String,
+      transactionRef: String
+    },
+    orderStatus: {
+      type: String,
+      enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+      default: 'pending'
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
   },
   { timestamps: true }

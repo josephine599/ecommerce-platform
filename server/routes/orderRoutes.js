@@ -1,10 +1,16 @@
 const express = require("express");
-const { createOrder } = require("../controllers/orderController");
+const { createOrder, getOrderById, updatePaymentStatus } = require("../controllers/orderController");
 const { protect } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.post("/", protect, createOrder);
+// Create order (no auth required for guest checkout)
+router.post("/", createOrder);
+
+// Get order by ID
+router.get("/:id", getOrderById);
+
+// Update payment status (can add auth if needed)
+router.put("/:id/payment-status", updatePaymentStatus);
 
 module.exports = router;
-"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OWYwYzAwNGMzYmE5Zjk0YzQyOTA1YyIsImlhdCI6MTc3MjAzMTA2NSwiZXhwIjoxNzc0NjIzMDY1fQ.IqBS4gUEP2nYInTXfQYb-LdIPd1jBjbXh3hIvEAhU_o"
